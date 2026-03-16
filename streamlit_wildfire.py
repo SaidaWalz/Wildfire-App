@@ -178,7 +178,18 @@ def fetch_era5_sequence(lat: float, lon: float, end_date_str: str) -> pd.DataFra
         tmp_path,
     )
 
-    ds = xr.open_dataset(tmp_path)
+    # CDS sometimes returns a ZIP containing the NetCDF — unzip if needed
+    import zipfile
+    if zipfile.is_zipfile(tmp_path):
+        extract_dir = tempfile.mkdtemp()
+        with zipfile.ZipFile(tmp_path, "r") as z:
+            z.extractall(extract_dir)
+        candidates = list(Path(extract_dir).glob("*.nc")) + list(Path(extract_dir).glob("*.netcdf"))
+        if not candidates:
+            raise RuntimeError("ZIP from CDS contained no .nc files")
+        tmp_path = str(candidates[0])
+
+    ds = xr.open_dataset(tmp_path, engine="netcdf4")
 
     # Select nearest grid point to H3 cell centre
     ds_pt = ds.sel(

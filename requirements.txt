@@ -1,0 +1,12 @@
+streamlit
+streamlit-folium
+folium
+h3
+cdsapi
+xarray
+netcdf4
+tensorflow
+numpy
+pandas
+cfgrib
+eccodes

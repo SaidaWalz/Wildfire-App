@@ -196,11 +196,12 @@ def fetch_era5_sequence(lat: float, lon: float, end_date_str: str) -> pd.DataFra
         tmp_path = str(candidates[0])
 
     ds = xr.open_dataset(tmp_path, engine="netcdf4")
-    st.write("Variablen:", list(ds.data_vars))
-    st.write("Koordinaten:", list(ds.coords))
-    st.write("Erster Zeitwert:", str(ds["valid_time"].values[0]))
+
     # Select nearest grid point to H3 cell centre
     ds_pt = ds.sel(latitude=lat, longitude=lon, method="nearest")
+
+    # ERA5 uses 'valid_time' as the time coordinate
+    time_coord = "valid_time" if "valid_time" in ds_pt.coords else "time"
 
     # Build monthly DataFrame — one row per month
     records = []
@@ -209,11 +210,10 @@ def fetch_era5_sequence(lat: float, lon: float, end_date_str: str) -> pd.DataFra
 
         def _val(var):
             try:
-                # select by year+month
-                times = ds_pt["valid_time"].values
+                times = ds_pt[time_coord].values
                 mask  = [(str(t)[:7] == month_str) for t in times]
                 idx   = next(i for i, m in enumerate(mask) if m)
-                return float(ds_pt[var].isel(time=idx).values)
+                return float(ds_pt[var].isel({time_coord: idx}).values)
             except Exception:
                 return np.nan
 
@@ -527,8 +527,8 @@ if st.session_state["result"] is not None:
         )
 
 elif st.session_state["h3_cell"] is None:
-    st.info("👆 Click anywhere on the map to select an H3 r=5 cell.")
+    st.info("👆 Click anywhere on the map to select an H3 r5 cell.")
 else:
     st.info("📍 Cell selected — press **▶ Run Prediction** in the sidebar.")
 
-st.caption("Wildfire Prediction · ERA5-Land + LSTM · H3 r=5")
+st.caption("Wildfire Prediction · ERA5-Land + LSTM · H3 r5")

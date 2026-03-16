@@ -190,7 +190,9 @@ def fetch_era5_sequence(lat: float, lon: float, end_date_str: str) -> pd.DataFra
         tmp_path = str(candidates[0])
 
     ds = xr.open_dataset(tmp_path, engine="netcdf4")
-
+    ds = xr.open_dataset(tmp_path, engine="netcdf4")
+    st.write("Variablen in der Datei:", list(ds.data_vars))
+    st.write("Koordinaten:", list(ds.coords))
     # Select nearest grid point to H3 cell centre
     ds_pt = ds.sel(
         latitude=lat,

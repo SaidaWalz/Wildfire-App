@@ -134,29 +134,37 @@ def get_cds_client():
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_era5_sequence(lat: float, lon: float, end_date_str: str) -> pd.DataFrame:
     """
-    Download daily ERA5-Land for the 12 days ending on end_date_str (YYYY-MM-DD).
+    Download ERA5-Land Monthly Averaged for the 12 months ending on end_date_str.
     Returns DataFrame shape (12, 7) — columns = FEATURE_NAMES.
     """
     import cdsapi
     import xarray as xr
+    import zipfile
 
-    end   = datetime.strptime(end_date_str, "%Y-%m-%d")
-    start = end - timedelta(days=SEQ_LEN - 1)
+    end = datetime.strptime(end_date_str, "%Y-%m-%d")
 
-    # ERA5-Land is available with ~5-day latency; clamp to yesterday
-    yesterday = datetime.utcnow() - timedelta(days=5)
-    if end > yesterday:
-        end   = yesterday
-        start = end - timedelta(days=SEQ_LEN - 1)
+    # ERA5 monthly means have ~3 month latency — clamp to 3 months ago
+    latest = datetime.utcnow().replace(day=1) - timedelta(days=90)
+    if end > latest:
+        end = latest
 
-    years  = sorted({str(d.year)  for d in [start + timedelta(i) for i in range(SEQ_LEN)]})
-    months = sorted({str(d.month).zfill(2) for d in [start + timedelta(i) for i in range(SEQ_LEN)]})
-    days   = sorted({str(d.day).zfill(2)   for d in [start + timedelta(i) for i in range(SEQ_LEN)]})
+    # Build list of 12 months going back from end
+    months_list = []
+    d = end.replace(day=1)
+    for _ in range(SEQ_LEN):
+        months_list.append(d)
+        # go back one month
+        if d.month == 1:
+            d = d.replace(year=d.year - 1, month=12)
+        else:
+            d = d.replace(month=d.month - 1)
+    months_list = sorted(months_list)  # chronological order
 
-    # bounding box: 0.5° around the H3 cell centre
-    area = [lat + 0.5, lon - 0.5, lat - 0.5, lon + 0.5]   # N W S E  (wrong order for CDS)
+    years  = sorted({str(d.year)           for d in months_list})
+    months = sorted({str(d.month).zfill(2) for d in months_list})
+
     area = [round(lat + 0.5, 2), round(lon - 0.5, 2),
-            round(lat - 0.5, 2), round(lon + 0.5, 2)]       # N, W, S, E
+            round(lat - 0.5, 2), round(lon + 0.5, 2)]  # N, W, S, E
 
     client = get_cds_client()
 
@@ -164,22 +172,20 @@ def fetch_era5_sequence(lat: float, lon: float, end_date_str: str) -> pd.DataFra
         tmp_path = tmp.name
 
     client.retrieve(
-        "reanalysis-era5-land",
+        "reanalysis-era5-land-monthly-means",
         {
-            "product_type": "reanalysis",
+            "product_type": "monthly_averaged_reanalysis",
             "variable":     ERA5_VARIABLES,
             "year":         years,
             "month":        months,
-            "day":          days,
-            "time":         ["12:00"],   # daily noon snapshot
+            "time":         "00:00",
             "area":         area,
             "format":       "netcdf",
         },
         tmp_path,
     )
 
-    # CDS sometimes returns a ZIP containing the NetCDF — unzip if needed
-    import zipfile
+    # CDS sometimes returns a ZIP — unzip if needed
     if zipfile.is_zipfile(tmp_path):
         extract_dir = tempfile.mkdtemp()
         with zipfile.ZipFile(tmp_path, "r") as z:
@@ -190,32 +196,29 @@ def fetch_era5_sequence(lat: float, lon: float, end_date_str: str) -> pd.DataFra
         tmp_path = str(candidates[0])
 
     ds = xr.open_dataset(tmp_path, engine="netcdf4")
-    ds = xr.open_dataset(tmp_path, engine="netcdf4")
-    st.write("Variablen in der Datei:", list(ds.data_vars))
-    st.write("Koordinaten:", list(ds.coords))
-    # Select nearest grid point to H3 cell centre
-    ds_pt = ds.sel(
-        latitude=lat,
-        longitude=lon,
-        method="nearest",
-    )
 
-    # Build daily DataFrame
+    # Select nearest grid point to H3 cell centre
+    ds_pt = ds.sel(latitude=lat, longitude=lon, method="nearest")
+
+    # Build monthly DataFrame — one row per month
     records = []
-    for i in range(SEQ_LEN):
-        day = start + timedelta(days=i)
-        t   = {"time": np.datetime64(day.strftime("%Y-%m-%dT12:00"))}
+    for d in months_list:
+        month_str = d.strftime("%Y-%m")
 
         def _val(var):
             try:
-                return float(ds_pt[var].sel(time=t["time"], method="nearest").values)
+                # select by year+month
+                times = ds_pt["time"].values
+                mask  = [(str(t)[:7] == month_str) for t in times]
+                idx   = next(i for i, m in enumerate(mask) if m)
+                return float(ds_pt[var].isel(time=idx).values)
             except Exception:
                 return np.nan
 
-        u    = _val("u10")
-        v    = _val("v10")
-        rec  = {
-            "date":                                  day.strftime("%Y-%m-%d"),
+        u = _val("u10")
+        v = _val("v10")
+        rec = {
+            "date":                                  month_str,
             "2m_temperature":                        _val("t2m"),
             "volumetric_soil_water_layer_1":         _val("swvl1"),
             "surface_solar_radiation_downwards":     _val("ssrd"),
@@ -329,7 +332,7 @@ with st.sidebar:
         value=datetime.utcnow().date() - timedelta(days=5),
         max_value=datetime.utcnow().date() - timedelta(days=5),
     )
-    st.caption(f"Fetches {SEQ_LEN} days: {end_date - timedelta(days=SEQ_LEN-1)} → {end_date}")
+    st.caption(f"Fetches 12 months ending: {end_date.strftime('%Y-%m')}")
 
     st.divider()
     run_btn   = st.button("▶ Run Prediction", type="primary", use_container_width=True,
@@ -428,7 +431,7 @@ if run_btn and st.session_state["h3_cell"] and model_obj:
     cell_lon   = st.session_state["cell_lon"]
     end_str    = end_date.strftime("%Y-%m-%d")
 
-    with st.spinner(f"⬇️ Fetching ERA5-Land for ({cell_lat:.4f}, {cell_lon:.4f}) — last {SEQ_LEN} days…"):
+    with st.spinner(f"⬇️ Fetching ERA5-Land monthly data for ({cell_lat:.4f}, {cell_lon:.4f}) — last 12 months…"):
         try:
             era5_df = fetch_era5_sequence(cell_lat, cell_lon, end_str)
             st.session_state["era5_df"] = era5_df
@@ -476,7 +479,7 @@ if st.session_state["result"] is not None:
     # ERA5 feature table
     if st.session_state["era5_df"] is not None:
         st.divider()
-        st.subheader("📊 ERA5-Land Input Sequence (12 days)")
+        st.subheader("📊 ERA5-Land Input Sequence (12 months)")
         df_show = st.session_state["era5_df"].copy()
 
         # Format for display
@@ -522,8 +525,8 @@ if st.session_state["result"] is not None:
         )
 
 elif st.session_state["h3_cell"] is None:
-    st.info("👆 Click anywhere on the map to select an H3 r5 cell.")
+    st.info("👆 Click anywhere on the map to select an H3 r=5 cell.")
 else:
     st.info("📍 Cell selected — press **▶ Run Prediction** in the sidebar.")
 
-st.caption("Wildfire Prediction · ERA5-Land + LSTM · H3 r5 · Québec")
+st.caption("Wildfire Prediction · ERA5-Land + LSTM · H3 r=5")

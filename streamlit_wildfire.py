@@ -347,7 +347,8 @@ map_center = list(st.session_state["center"])
 m = folium.Map(
     location=map_center,
     zoom_start=DEFAULT_ZOOM,
-    tiles="CartoDB positron",
+    tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attr="Esri World Imagery",
 )
 
 # Draw currently selected H3 hexagon
@@ -447,7 +448,7 @@ if st.session_state["result"] is not None:
         st.markdown(
             f'<div class="risk-card {card_cls}">'
             f'<span class="{lbl_cls}">{emoji} {label} Risk</span><br><br>'
-            f'<span style="color:#ccc;font-size:0.95rem;">'
+            f'<span style="color:#333333;font-size:0.95rem;">'
             f'H3 cell: <code>{st.session_state["h3_cell"]}</code><br>'
             f'Centre: {st.session_state["cell_lat"]:.5f}, {st.session_state["cell_lon"]:.5f}'
             f'</span></div>',

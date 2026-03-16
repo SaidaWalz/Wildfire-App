@@ -304,7 +304,7 @@ with st.spinner("Loading LSTM model…"):
         model_err  = str(e)
 
 if model_err:
-    st.warning(f"⚠️ Model not loaded: {model_err}\n\nPlace your model at `{MODEL_PATH}`")
+    st.warning(f" Model not loaded: {model_err}\n\nPlace your model at `{MODEL_PATH}`")
 
 # ─────────────────────────────────────────────────────────
 # SESSION STATE
@@ -320,7 +320,7 @@ if "era5_df"  not in st.session_state: st.session_state["era5_df"]  = None
 # SIDEBAR
 # ─────────────────────────────────────────────────────────
 with st.sidebar:
-    st.header("📍 Selected Cell")
+    st.header("Selected Cell")
     if st.session_state["h3_cell"]:
         st.code(st.session_state["h3_cell"], language=None)
         st.write(f"Center: `{st.session_state['cell_lat']:.5f}, {st.session_state['cell_lon']:.5f}`")
@@ -328,7 +328,7 @@ with st.sidebar:
         st.info("Click the map to select a cell.")
 
     st.divider()
-    st.header("📅 Date Range")
+    st.header(" Date Range")
     end_date = st.date_input(
         "End date (last day of sequence)",
         value=datetime.utcnow().date() - timedelta(days=5),
@@ -339,10 +339,10 @@ with st.sidebar:
     st.divider()
     run_btn   = st.button("▶ Run Prediction", type="primary", use_container_width=True,
                           disabled=(st.session_state["h3_cell"] is None or model_obj is None))
-    clear_btn = st.button("🗑 Clear", use_container_width=True)
+    clear_btn = st.button(" Clear", use_container_width=True)
 
     st.divider()
-    st.header("ℹ️ Info")
+    st.header(" Info")
     st.markdown(f"""
 - **Model:** LSTM(64) → input `(12, 7)`
 - **H3 resolution:** {H3_RES}
@@ -359,7 +359,7 @@ if clear_btn:
 # ─────────────────────────────────────────────────────────
 # MAP
 # ─────────────────────────────────────────────────────────
-st.subheader("🗺️ Click to select H3 cell")
+st.subheader("Click to select location")
 
 map_center = list(st.session_state["center"])
 m = folium.Map(
@@ -433,7 +433,7 @@ if run_btn and st.session_state["h3_cell"] and model_obj:
     cell_lon   = st.session_state["cell_lon"]
     end_str    = end_date.strftime("%Y-%m-%d")
 
-    with st.spinner(f"⬇️ Fetching ERA5-Land monthly data for ({cell_lat:.4f}, {cell_lon:.4f}) — last 12 months…"):
+    with st.spinner(f"Fetching ERA5-Land monthly data for ({cell_lat:.4f}, {cell_lon:.4f}) — last 12 months…"):
         try:
             era5_df = fetch_era5_sequence(cell_lat, cell_lon, end_str)
             st.session_state["era5_df"] = era5_df
@@ -441,7 +441,7 @@ if run_btn and st.session_state["h3_cell"] and model_obj:
             st.error(f"ERA5 fetch failed: {e}")
             st.stop()
 
-    with st.spinner("🧠 Running LSTM inference…"):
+    with st.spinner(" Running LSTM inference…"):
         try:
             p = run_lstm(model_obj, scaler_obj, st.session_state["era5_df"])
             st.session_state["result"] = p
@@ -459,7 +459,7 @@ if st.session_state["result"] is not None:
     label, emoji, card_cls, lbl_cls = risk_info(p_val)
 
     st.divider()
-    st.subheader("🔬 Prediction Result")
+    st.subheader(" Prediction Result")
 
     col_risk, col_prob = st.columns([2, 1])
     with col_risk:
@@ -527,8 +527,8 @@ if st.session_state["result"] is not None:
         )
 
 elif st.session_state["h3_cell"] is None:
-    st.info("👆 Click anywhere on the map to select an H3 r5 cell.")
+    st.info(" Click anywhere on the map to select an H3 r5 cell.")
 else:
-    st.info("📍 Cell selected — press **▶ Run Prediction** in the sidebar.")
+    st.info(" Cell selected — press **▶ Run Prediction** in the sidebar.")
 
 st.caption("Wildfire Prediction · ERA5-Land + LSTM · H3 r5")

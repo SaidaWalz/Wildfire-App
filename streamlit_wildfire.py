@@ -30,31 +30,31 @@ from streamlit_folium import st_folium
 # PAGE CONFIG
 # ─────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="🔥 Québec Wildfire Risk",
+    page_title="Wildfire Prediction",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 st.markdown("""
 <style>
-[data-testid="stAppViewContainer"] { background: #0d1a0d; }
-[data-testid="stSidebar"]          { background: #111f11; border-right:1px solid #2a4a2a; }
-h1,h2,h3,h4                        { color: #e8c97a !important; }
+[data-testid="stAppViewContainer"] { background: #ffffff; }
+[data-testid="stSidebar"]          { background: #f7f7f7; border-right:1px solid #e0e0e0; }
+h1,h2,h3,h4                        { color: #1a1a1a !important; }
 .risk-card {
     border-radius: 12px; padding: 18px 22px; margin: 10px 0;
-    border: 1px solid #3a6a3a;
+    border: 1px solid #e0e0e0;
 }
-.risk-high   { background:#2a0a0a; border-color:#cc3333; }
-.risk-medium { background:#2a1a00; border-color:#cc7700; }
-.risk-low    { background:#0a2a0a; border-color:#33aa33; }
-.risk-none   { background:#1a1a1a; border-color:#555555; }
-.risk-label-high   { color:#ff5555; font-size:2rem; font-weight:800; }
-.risk-label-medium { color:#ffaa00; font-size:2rem; font-weight:800; }
-.risk-label-low    { color:#55cc55; font-size:2rem; font-weight:800; }
-.risk-label-none   { color:#888888; font-size:2rem; font-weight:800; }
-.feat-table { font-size:0.85rem; color:#ccc; }
-.stButton>button { background:#1e4a1e; color:#e8c97a; border:1px solid #3a7a2a; border-radius:8px; font-weight:700; }
-.stButton>button:hover { background:#2a6a2a; }
+.risk-high   { background:#fff0f0; border-color:#cc3333; }
+.risk-medium { background:#fff8f0; border-color:#cc7700; }
+.risk-low    { background:#f0fff0; border-color:#33aa33; }
+.risk-none   { background:#f7f7f7; border-color:#aaaaaa; }
+.risk-label-high   { color:#cc2222; font-size:2rem; font-weight:800; }
+.risk-label-medium { color:#cc7700; font-size:2rem; font-weight:800; }
+.risk-label-low    { color:#228822; font-size:2rem; font-weight:800; }
+.risk-label-none   { color:#666666; font-size:2rem; font-weight:800; }
+.feat-table { font-size:0.85rem; color:#333; }
+.stButton>button { background:#f0f0f0; color:#1a1a1a; border:1px solid #cccccc; border-radius:8px; font-weight:700; }
+.stButton>button:hover { background:#e0e0e0; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -173,26 +173,13 @@ def fetch_era5_sequence(lat: float, lon: float, end_date_str: str) -> pd.DataFra
             "day":          days,
             "time":         ["12:00"],   # daily noon snapshot
             "area":         area,
-            "format":       "netcdf4",
+            "format":       "netcdf",
         },
         tmp_path,
     )
 
-    
-    import zipfile
-        
-        # Entzippen falls ZIP
-    if zipfile.is_zipfile(tmp_path):
-        with zipfile.ZipFile(tmp_path, 'r') as z:
-            extract_dir = tempfile.mkdtemp()
-            z.extractall(extract_dir)
-            extracted = list(Path(extract_dir).glob("*.nc"))
-            if not extracted:
-                extracted = list(Path(extract_dir).glob("*.grib"))
-            tmp_path = str(extracted[0])
-    
-    ds = xr.open_dataset(tmp_path, engine="netcdf4")
-    
+    ds = xr.open_dataset(tmp_path)
+
     # Select nearest grid point to H3 cell centre
     ds_pt = ds.sel(
         latitude=lat,
@@ -284,7 +271,7 @@ def h3_polygon_coords(cell: str):
 # ─────────────────────────────────────────────────────────
 # LOAD MODEL AT STARTUP
 # ─────────────────────────────────────────────────────────
-st.title("🔥 Québec Wildfire Risk")
+st.title("Wildfire Prediction")
 st.caption("Click anywhere on the map → snaps to H3 r5 cell → fetches ERA5-Land (last 12 days) → LSTM prediction")
 
 model_obj  = None
@@ -360,7 +347,7 @@ map_center = list(st.session_state["center"])
 m = folium.Map(
     location=map_center,
     zoom_start=DEFAULT_ZOOM,
-    tiles="CartoDB dark_matter",
+    tiles="CartoDB positron",
 )
 
 # Draw currently selected H3 hexagon
@@ -390,9 +377,9 @@ if st.session_state["h3_cell"]:
 # Legend
 legend = """
 <div style="position:fixed;bottom:28px;right:28px;z-index:9999;
-            background:#111f11;border:1px solid #3a6a3a;border-radius:10px;
-            padding:12px 16px;font-size:12px;color:#ccc;">
-  <b style="color:#e8c97a">Fire Risk</b><br>
+            background:#ffffff;border:1px solid #cccccc;border-radius:10px;
+            padding:12px 16px;font-size:12px;color:#333333;">
+  <b style="color:#1a1a1a">Fire Risk</b><br>
   <span style="color:#cc2222">■</span> High ≥ 0.75<br>
   <span style="color:#dd8800">■</span> Moderate ≥ 0.50<br>
   <span style="color:#eecc00">■</span> Low ≥ 0.25<br>
@@ -525,4 +512,4 @@ elif st.session_state["h3_cell"] is None:
 else:
     st.info("📍 Cell selected — press **▶ Run Prediction** in the sidebar.")
 
-st.caption("Wildfire Risk · ERA5-Land + LSTM · H3 r5 · Québec")
+st.caption("Wildfire Prediction · ERA5-Land + LSTM · H3 r5 · Québec")

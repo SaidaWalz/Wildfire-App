@@ -198,7 +198,7 @@ def fetch_era5_sequence(lat: float, lon: float, end_date_str: str) -> pd.DataFra
     ds = xr.open_dataset(tmp_path, engine="netcdf4")
     st.write("Variablen:", list(ds.data_vars))
     st.write("Koordinaten:", list(ds.coords))
-    st.write("Erster Zeitwert:", str(ds["time"].values[0]))
+    st.write("Erster Zeitwert:", str(ds["valid_time"].values[0]))
     # Select nearest grid point to H3 cell centre
     ds_pt = ds.sel(latitude=lat, longitude=lon, method="nearest")
 
@@ -210,7 +210,7 @@ def fetch_era5_sequence(lat: float, lon: float, end_date_str: str) -> pd.DataFra
         def _val(var):
             try:
                 # select by year+month
-                times = ds_pt["time"].values
+                times = ds_pt["valid_time"].values
                 mask  = [(str(t)[:7] == month_str) for t in times]
                 idx   = next(i for i, m in enumerate(mask) if m)
                 return float(ds_pt[var].isel(time=idx).values)

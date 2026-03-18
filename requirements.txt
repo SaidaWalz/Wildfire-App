@@ -12,4 +12,4 @@ cfgrib
 eccodes
 xgboost
 joblib
-sklearn
+scikitlearn
